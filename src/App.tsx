@@ -1,26 +1,20 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import { useEffect, useState } from "react";
 
-function App() {
+export default function App() {
+  const [status, setStatus] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/health")
+        .then((r) => r.json())
+        .then(setStatus)
+        .catch((e) => setStatus({ error: String(e) }));
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+      <div style={{ fontFamily: "system-ui", padding: 24 }}>
+        <h1>HHPreventiveCareMonitor</h1>
+        <pre>{JSON.stringify(status, null, 2)}</pre>
+      </div>
   );
 }
-
-export default App;
