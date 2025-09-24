@@ -39,8 +39,8 @@ def ensure_members(conn, rows: List[Dict[str, Any]]) -> int:
     INSERT INTO app.member (public_id, sex)
     VALUES (%s, %s)
     ON CONFLICT (public_id) DO UPDATE SET
-    sex = EXCLUDED.sex,
-    updated_at = now();
+      sex = EXCLUDED.sex,
+      updated_at = now();
     """
     with conn.cursor() as cur:
         cur.executemany(sql, [(r["public_id"], r.get("sex")) for r in rows])
@@ -74,9 +74,8 @@ def ensure_labs(conn, rows: List[Dict[str, Any]]) -> int:
     INSERT INTO app.lab_result (member_id, code, value_num, unit, collected_at)
     VALUES (%s, %s, %s, %s, %s)
     ON CONFLICT (member_id, code, collected_at) DO UPDATE SET
-    value_num = EXCLUDED.value_num,
-    unit = EXCLUDED.unit,
-    created_at = app.lab_result.created_at;  -- keep original created_at
+      value_num = EXCLUDED.value_num,
+      unit = EXCLUDED.unit;
     """
     params = []
     for r in rows:
@@ -106,8 +105,7 @@ def ensure_immunizations(conn, rows: List[Dict[str, Any]]) -> int:
     sql = """
     INSERT INTO app.immunization (member_id, code, administered_at)
     VALUES (%s, %s, %s)
-    ON CONFLICT (member_id, code, administered_at) DO UPDATE SET
-    created_at = app.immunization.created_at;
+    ON CONFLICT (member_id, code, administered_at) DO NOTHING;
     """
     params = []
     for r in rows:
