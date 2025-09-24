@@ -56,9 +56,45 @@ def _member_id_map(conn, public_ids: List[str]) -> Dict[str, str]:
         )
         return {row[0]: str(row[1]) for row in cur.fetchall()}
 
+def ensure_labs(conn, rows: List[Dict[str, Any]]) -> int:
+    """
+    rows: [{"public_id":"M0001","code":"4548-4","value_num":7.1,"unit":"%","collected_at":"2025-01-10T09:15:00Z"}, ...]
+    Upsert by (member_id, code, collected_at)
+    """
+    if not rows:
+        return 0
+    # resolve member_ids
+    ids = _member_id_map(conn, list({r["public_id"] for r in rows}))
+    missing = [pid for pid in {r["public_id"] for r in rows} if pid not in ids]
+    if missing:
+        raise ValueError(f"Missing members for labs: {missing}. Seed members first.")
+
+    # normalize timestamps to ISO 8601
+    sql = """
+    INSERT INTO app.lab_result (member_id, code, value_num, unit, collected_at)
+    VALUES (%s, %s, %s, %s, %s)
+    ON CONFLICT (member_id, code, collected_at) DO UPDATE SET
+    value_num = EXCLUDED.value_num,
+    unit = EXCLUDED.unit,
+    created_at = app.lab_result.created_at;  -- keep original created_at
+    """
+    params = []
+    for r in rows:
+        params.append((
+            ids[r["public_id"]],
+            r["code"],
+            r.get("value_num"),
+            r.get("unit"),
+            r["collected_at"],
+        ))
+    with conn.cursor() as cur:
+        cur.executemany(sql, params)
+    return len(rows)
+
 def main():
     parser = argparse.ArgumentParser(description="Seed members, labs, immunizations (idempotent).")
     parser.add_argument("--members", "-m", help="Path to members.json")
+    parser.add_argument("--labs", "-l", help="Path to labs.json")
     args = parser.parse_args()
 
     if not (args.members or args.labs or args.immunizations):
@@ -72,6 +108,11 @@ def main():
             members = load_json(args.members)
             n = ensure_members(conn, members)
             print(f"[seed] members upserted: {n}")
+            total += n
+        if args.labs:
+            labs = load_json(args.labs)
+            n = ensure_labs(conn, labs)
+            print(f"[seed] labs upserted: {n}")
             total += n
 
         conn.commit()
