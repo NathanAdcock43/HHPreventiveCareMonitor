@@ -69,10 +69,10 @@ def main():
         conn.execute("SET SESSION TIME ZONE 'UTC';")
         total = 0
         if args.members:
-                        members = load_json(args.members)
-                        n = ensure_members(conn, members)
-                        print(f"[seed] members upserted: {n}")
-                        total += n
+            members = load_json(args.members)
+            n = ensure_members(conn, members)
+            print(f"[seed] members upserted: {n}")
+            total += n
 
         conn.commit()
         print(f"[seed] done. total rows considered: {total}")
