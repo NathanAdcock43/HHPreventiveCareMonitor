@@ -39,7 +39,9 @@ export default function App() {
             const res = await fetch(`/alerts?type=A1C_OVERDUE`);
             const data = await res.json();
             setSummary(data.summary || []);
-        } catch {/* ignore */}
+        } catch {
+            /* ignore */
+        }
     };
 
     const fetchOpenAlerts = async () => {
@@ -54,8 +56,8 @@ export default function App() {
         }
     };
 
-    const refresh = async () => {
-        await Promise.all([fetchAlerts(), fetchSummary(), fetchOpenAlerts()]);
+    const refresh = async (id?: string) => {
+        await Promise.all([fetchAlerts(id), fetchSummary(), fetchOpenAlerts()]);
     };
 
     const createMember = async () => {
@@ -69,7 +71,7 @@ export default function App() {
         }
         if (d.public_id) setMember(d.public_id);
         setMsg(`New member enrolled: ${d.public_id}`);
-        await refresh();
+        await refresh(d.public_id);
         return d.public_id as string;
     };
 
@@ -83,7 +85,7 @@ export default function App() {
     };
 
     /** Prefer a random member with open alerts; fall back to current. */
-    async function pickRandomMember(current: string): Promise<string | null> {
+    async function pickRandomMember(current: string): Promise<string> {
         try {
             const res = await fetch(`/alerts/open?limit=500&offset=0`);
             if (res.ok) {
@@ -93,31 +95,38 @@ export default function App() {
                     return ids[Math.floor(Math.random() * ids.length)];
                 }
             }
-        } catch {/* ignore */}
-        return current || null;
+        } catch {
+            /* ignore */
+        }
+        return current;
     }
 
-    /** Single “Random Event” button logic */
+    // Map API action keys to the exact user-facing messages (as provided)
+    const messageMap: Record<
+        "lab_recent" | "lab_old" | "flu_recent" | "flu_old",
+        string
+    > = {
+        lab_recent: "Member record for new A1C Lab received",
+        lab_old: "Member record for outdated A1C Lab received",
+        flu_recent: "Recent member Flu immunization record received",
+        flu_old: "Outdated member Flu immunization records received",
+    };
+
+    /** Single “Random Event” button (no member creation as an event) */
     const runRandomEvent = async () => {
         setMsg(null);
         setError(null);
 
         const actions = ["lab_recent", "lab_old", "flu_recent", "flu_old"] as const;
-
-        // renamed prettyMap -> messageMap for clarity
-        const messageMap: Record<typeof actions[number], string> = {
-            lab_recent: "Member file for new A1C Lab",
-            lab_old: "Member file for outdated A1C Lab",
-            flu_recent: "Member received recent Flu imunization",
-            flu_old: "Oudated member Flu imunization records received",
-        };
-
         const action = actions[Math.floor(Math.random() * actions.length)];
-        let target = (await pickRandomMember(member)) || member;
 
+        // choose a random member to target (prefer open alerts)
+        let target = await pickRandomMember(member);
+
+        // try once on the chosen target
         let r = await simulate(action, target);
 
-        // auto-create a member if target doesn't exist
+        // if that member doesn't exist, create one and retry once
         if (!r.ok && r.data?.error === "not_found") {
             const pid = await createMember();
             if (!pid) {
@@ -135,17 +144,8 @@ export default function App() {
 
         // update UI to that member and force alerts refresh for it
         setMember(target);
-        await Promise.all([fetchAlerts(target), fetchSummary(), fetchOpenAlerts()]);
-
-        // determine if an alert was closed for this member
-        const closedNow = (type: string) =>
-            alerts.some((a: any) => a.type === type && a.status === "CLOSED");
-
-        const msgClosed =
-            (action === "lab_recent" && closedNow("A1C_OVERDUE")) ||
-            (action === "flu_recent" && closedNow("FLU_OVERDUE"));
-
-        setMsg(`${msgClosed ? "Alert Closed: " : ""}${messageMap[action]} (${target})`);
+        setMsg(`${messageMap[action]} (${target})`);
+        await refresh(target);
     };
 
     useEffect(() => {
@@ -153,95 +153,126 @@ export default function App() {
     }, []);
 
     return (
-        <div className="app">
-            <h1 className="header">Preventive Care Internal DashBoard</h1>
+        <div className="container">
+            <h1 className="header">Preventive Care Internal Dashboard</h1>
 
-            <div className="toolbar">
-                <label>Member:&nbsp;</label>
-                <input
-                    className="input"
-                    value={member}
-                    onChange={(e) => setMember(e.target.value)}
-                />
-                <button className="btn" onClick={() => fetchAlerts(member)}>
-                    Load Alerts
-                </button>
-            </div>
 
-            {loading && <p>Loading…</p>}
-            {error && (
-                <p role="alert" className="err">
-                    Error: {error}
-                </p>
-            )}
+            <div className="card" style={{marginTop: "10px"}}>
+                <div className="badge">
+                        <h2 className="section-title">Members with open alerts</h2>
+                        <div className="meta">Open: {openTotal}</div>
+                </div>
 
-            {/* Member-specific alerts */}
-            <h2 className="section-title">Member Alerts</h2>
-            {alerts.length === 0 ? (
-                <p className="meta">No active alerts.</p>
-            ) : (
-                <ul>
-                    {alerts.map((a) => (
-                        <li key={`${a.type}-${a.detected_at}`}>
-                            <b>{a.type}</b> — {a.status} (updated{" "}
-                            {new Date(a.updated_at).toLocaleString()})
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            <h2 className="section-title">Members with Open Alerts</h2>
-            <div className="meta">Open: {openTotal}</div>
-
-            <div className="center-wrap">
-                <div className="card">
-                    <div className="grid-wrap">
-                        <table className="open-grid">
-                            <thead>
+                <div className="grid-wrap">
+                    <table className="open-grid">
+                        <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Sex</th>
+                            <th>Alert Types</th>
+                            <th>Last Updated</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {openItems.length === 0 ? (
                             <tr>
-                                <th>Member</th>
-                                <th>Sex</th>
-                                <th>Alert Types</th>
-                                <th>Last Updated</th>
+                                <td colSpan={4} className="meta" style={{padding: 12}}>
+                                    No members with open alerts.
+                                </td>
                             </tr>
-                            </thead>
-                            <tbody>
-                            {openItems.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="meta" style={{ padding: 12 }}>
-                                        No members with open alerts.
+                        ) : (
+                            openItems.map((row) => (
+                                <tr key={row.public_id}>
+                                    <td>{row.public_id}</td>
+                                    <td>{row.sex ?? "—"}</td>
+                                    <td>
+                                        {row.alert_types.map((t) => (
+                                            <span key={t} className="badge">
+                          {t}
+                        </span>
+                                        ))}
                                     </td>
+                                    <td>{new Date(row.last_updated).toLocaleString()}</td>
                                 </tr>
-                            ) : (
-                                openItems.map((row) => (
-                                    <tr key={row.public_id}>
-                                        <td>{row.public_id}</td>
-                                        <td>{row.sex ?? "—"}</td>
-                                        <td>
-                                            {row.alert_types.map((t) => (
-                                                <span key={t} className="badge">
-                            {t}
-                          </span>
-                                            ))}
-                                        </td>
-                                        <td>{new Date(row.last_updated).toLocaleString()}</td>
-                                    </tr>
-                                ))
-                            )}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))
+                        )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <h2 className="section-title">Simulate System Events</h2>
-            <button className="btn" onClick={createMember}>
-                Member Enrollment
-            </button>
-            <button className="btn" onClick={runRandomEvent}>
-                Random Medical Event
-            </button>
-            {msg && <p className="msg">{msg}</p>}
+            <div className="flex-container">
+                <div className="flex-box">
+
+
+                    {/* Member Select */}
+                    <div className="subhead">Member Select</div>
+                    <div className="toolbar">
+                        <label className="label">Member:&nbsp;</label>
+                        <input
+                            className="input"
+                            value={member}
+                            onChange={(e) => setMember(e.target.value)}
+                        />
+                        <button className="btn" onClick={() => fetchAlerts(member)}>
+                            Load Alerts
+                        </button>
+                    </div>
+
+                    {/* Member Alerts (softer heading, no bullets) */}
+                    <div
+                        className="section-title"
+                        style={{fontSize: "20px", fontWeight: 600}}
+                    >
+                        Member alerts
+                    </div>
+                    {alerts.length === 0 ? (
+                        <p className="meta">No active alerts.</p>
+                    ) : (
+                        <ul className="alert-list">
+                            {alerts.map((a) => (
+                                <li className="alert-row" key={`${a.type}-${a.detected_at}`}>
+                                    <span>{a.status} ALERT (</span>
+                                    <span className="alert-type">{a.type})</span>
+                                    <span className="alert-meta">
+                (updated {new Date(a.updated_at).toLocaleString()})
+              </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+
+
+
+
+                </div>
+                <div className="flex-box">
+
+
+                    <h2 className="section-title">Simulate system events</h2>
+                    <div className="toolbar" style={{gap: "8px"}}>
+                        <button className="btn" onClick={createMember}>
+                            New Member Enrollment
+                        </button>
+                        <button className="btn primary" onClick={runRandomEvent}>
+                            Random Medical Event
+                        </button>
+                    </div>
+
+                    {msg && <p className="msg">{msg}</p>}
+                    {error && (
+                        <p role="alert" className="err">
+                            Error: {error}
+                        </p>
+                    )}
+
+                </div>
+            </div>
+
+
+
+
         </div>
     );
 }
