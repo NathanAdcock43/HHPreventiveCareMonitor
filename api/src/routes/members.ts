@@ -16,7 +16,7 @@ router.get("/:publicId/alerts", async (req, res) => {
     const { publicId } = req.params;   // keep this exactly as-is
 
     try {
-        // 1️⃣ Verify member exists
+        // Verify member exists
         const memberCheck = await pool.query(
             "SELECT 1 FROM app.member WHERE public_id = $1",
             [publicId]
@@ -28,7 +28,7 @@ router.get("/:publicId/alerts", async (req, res) => {
             });
         }
 
-        // 2️⃣ Fetch alerts if member exists
+        // Fetch alerts if member exists
         const { rows } = await pool.query(
             `
             SELECT ca.type, ca.status, ca.detected_at, ca.updated_at
