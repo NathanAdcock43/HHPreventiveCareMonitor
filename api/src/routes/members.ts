@@ -13,22 +13,37 @@ const pool = new Pool({
 });
 
 router.get("/:publicId/alerts", async (req, res) => {
-    const { publicId } = req.params;
+    const { publicId } = req.params;   // keep this exactly as-is
+
     try {
+        // 1️⃣ Verify member exists
+        const memberCheck = await pool.query(
+            "SELECT 1 FROM app.member WHERE public_id = $1",
+            [publicId]
+        );
+        if (memberCheck.rowCount === 0) {
+            return res.status(404).json({
+                error: "not_found",
+                message: `member ${publicId} not found`
+            });
+        }
+
+        // 2️⃣ Fetch alerts if member exists
         const { rows } = await pool.query(
             `
-                SELECT ca.type, ca.status, ca.detected_at, ca.updated_at
-                FROM app.care_alert ca
-                         JOIN app.member m ON m.member_id = ca.member_id
-                WHERE m.public_id = $1
-                ORDER BY ca.type
+            SELECT ca.type, ca.status, ca.detected_at, ca.updated_at
+            FROM app.care_alert ca
+            JOIN app.member m ON m.member_id = ca.member_id
+            WHERE m.public_id = $1
+            ORDER BY ca.type
             `,
             [publicId]
         );
-        return res.json(rows); // if no active alerts
+
+        return res.json(rows);
     } catch (e) {
         console.error(e);
-        res.status(500).json({ error: "server_error" });
+        return res.status(500).json({ error: "server_error" });
     }
 });
 
