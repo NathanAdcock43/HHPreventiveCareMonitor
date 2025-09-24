@@ -1,7 +1,7 @@
 [
   { "public_id": "M0001", "code": "4548-4", "value_num": 7.2, "unit": "%", "collected_at": "2025-09-14T10:00:00Z" },
 
-  { "public_id": "M0002", "code": "4548-4", "value_num": 6.9, "unit": "%", "collected_at": "2025-03-01T10:00:00Z" },
+  { "public_id": "M0002", "code": "4548-4", "value_num": 6.5, "unit": "%", "collected_at": "2025-09-023T10:00:00Z" },
 
   { "public_id": "M0003", "code": "4548-4", "value_num": 7.5, "unit": "%", "collected_at": "2024-08-20T10:00:00Z" },
 
