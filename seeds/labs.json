@@ -1,0 +1,12 @@
+[
+  { "public_id": "M0001", "code": "4548-4", "value_num": 7.2, "unit": "%", "collected_at": "2025-09-14T10:00:00Z" },
+
+  { "public_id": "M0002", "code": "4548-4", "value_num": 6.9, "unit": "%", "collected_at": "2025-03-01T10:00:00Z" },
+
+  { "public_id": "M0003", "code": "4548-4", "value_num": 7.5, "unit": "%", "collected_at": "2024-08-20T10:00:00Z" },
+
+  { "public_id": "M0005", "code": "4548-4", "value_num": 6.6, "unit": "%", "collected_at": "2025-03-28T10:00:00Z" },
+
+  { "public_id": "M0006", "code": "4548-4", "value_num": 7.1, "unit": "%", "collected_at": "2024-12-01T10:00:00Z" },
+  { "public_id": "M0006", "code": "4548-4", "value_num": 6.8, "unit": "%", "collected_at": "2025-09-04T10:00:00Z" }
+]
