@@ -17,19 +17,18 @@ router.get("/:publicId/alerts", async (req, res) => {
     try {
         const { rows } = await pool.query(
             `
-      SELECT ca.type, ca.status, ca.detected_at, ca.updated_at
-      FROM app.care_alert ca
-      JOIN app.member m ON m.member_id = ca.member_id
-      WHERE m.public_id = $1
-      ORDER BY ca.type
-      `,
+                SELECT ca.type, ca.status, ca.detected_at, ca.updated_at
+                FROM app.care_alert ca
+                         JOIN app.member m ON m.member_id = ca.member_id
+                WHERE m.public_id = $1
+                ORDER BY ca.type
+            `,
             [publicId]
         );
-        if (!rows.length) return res.json([]); // no active alerts
-        return res.json(rows);
-    } catch (e: any) {
-        console.error("GET /members/:publicId/alerts", e);
-        return res.status(500).json({ error: "server_error" });
+        return res.json(rows); // if no active alerts
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "server_error" });
     }
 });
 

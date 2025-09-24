@@ -16,17 +16,18 @@ router.get("/", async (req, res) => {
     try {
         const { rows } = await pool.query(
             `SELECT status, count(*)::int AS count
-       FROM app.care_alert
-       WHERE type = $1
-       GROUP BY status
-       ORDER BY status`,
+             FROM app.care_alert
+             WHERE type = $1
+             GROUP BY status
+             ORDER BY status`,
             [type]
         );
         res.json({ type, summary: rows });
-    } catch (e: any) {
-        console.error("GET /alerts", e);
+    } catch (e) {
+        console.error(e);
         res.status(500).json({ error: "server_error" });
     }
 });
 
 export default router;
+
