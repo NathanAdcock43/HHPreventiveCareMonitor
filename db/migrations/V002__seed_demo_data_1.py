@@ -28,8 +28,37 @@ def load_json(path: str) -> List[Dict[str, Any]]:
         return [data]
     return data
 
+def ensure_members(conn, rows: List[Dict[str, Any]]) -> int:
+    """
+    rows: [{"public_id":"M0001","sex":"F"}, ...]
+    Upsert by public_id (unique)
+    """
+    if not rows:
+        return 0
+    sql = """
+    INSERT INTO app.member (public_id, sex)
+    VALUES (%s, %s)
+    ON CONFLICT (public_id) DO UPDATE SET
+    sex = EXCLUDED.sex,
+    updated_at = now();
+    """
+    with conn.cursor() as cur:
+        cur.executemany(sql, [(r["public_id"], r.get("sex")) for r in rows])
+    return len(rows)
+
+def _member_id_map(conn, public_ids: List[str]) -> Dict[str, str]:
+    if not public_ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT public_id, member_id FROM app.member WHERE public_id = ANY(%s)",
+            (public_ids,),
+        )
+        return {row[0]: str(row[1]) for row in cur.fetchall()}
+
 def main():
     parser = argparse.ArgumentParser(description="Seed members, labs, immunizations (idempotent).")
+    parser.add_argument("--members", "-m", help="Path to members.json")
     args = parser.parse_args()
 
     if not (args.members or args.labs or args.immunizations):
@@ -39,6 +68,11 @@ def main():
     with get_conn() as conn:
         conn.execute("SET SESSION TIME ZONE 'UTC';")
         total = 0
+        if args.members:
+                        members = load_json(args.members)
+                        n = ensure_members(conn, members)
+                        print(f"[seed] members upserted: {n}")
+                        total += n
 
         conn.commit()
         print(f"[seed] done. total rows considered: {total}")
