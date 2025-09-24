@@ -91,10 +91,40 @@ def ensure_labs(conn, rows: List[Dict[str, Any]]) -> int:
         cur.executemany(sql, params)
     return len(rows)
 
+def ensure_immunizations(conn, rows: List[Dict[str, Any]]) -> int:
+    """
+    rows: [{"public_id":"M0001","code":"FLU","administered_at":"2024-10-15T00:00:00Z"}, ...]
+    Upsert by (member_id, code, administered_at)
+    """
+    if not rows:
+        return 0
+    ids = _member_id_map(conn, list({r["public_id"] for r in rows}))
+    missing = [pid for pid in {r["public_id"] for r in rows} if pid not in ids]
+    if missing:
+        raise ValueError(f"Missing members for immunizations: {missing}. Seed members first.")
+
+    sql = """
+    INSERT INTO app.immunization (member_id, code, administered_at)
+    VALUES (%s, %s, %s)
+    ON CONFLICT (member_id, code, administered_at) DO UPDATE SET
+    created_at = app.immunization.created_at;
+    """
+    params = []
+    for r in rows:
+        params.append((
+            ids[r["public_id"]],
+            r["code"],
+            r["administered_at"],
+        ))
+    with conn.cursor() as cur:
+        cur.executemany(sql, params)
+    return len(rows)
+
 def main():
     parser = argparse.ArgumentParser(description="Seed members, labs, immunizations (idempotent).")
     parser.add_argument("--members", "-m", help="Path to members.json")
     parser.add_argument("--labs", "-l", help="Path to labs.json")
+    parser.add_argument("--immunizations", "-i", help="Path to immunizations.json")
     args = parser.parse_args()
 
     if not (args.members or args.labs or args.immunizations):
@@ -113,6 +143,11 @@ def main():
             labs = load_json(args.labs)
             n = ensure_labs(conn, labs)
             print(f"[seed] labs upserted: {n}")
+            total += n
+        if args.immunizations:
+            imms = load_json(args.immunizations)
+            n = ensure_immunizations(conn, imms)
+            print(f"[seed] immunizations upserted: {n}")
             total += n
 
         conn.commit()
