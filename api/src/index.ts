@@ -2,6 +2,7 @@ import express from "express";
 import members from "./routes/members";
 import alerts from "./routes/alerts";
 import simulate from "./routes/simulate";
+import openAlerts from "./routes/openAlerts";
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -14,5 +15,6 @@ app.get("/version", (_req, res) =>
 app.use("/members", members);
 app.use("/alerts", alerts);
 app.use("/simulate", simulate);
+app.use("/alerts/open", openAlerts);
 
 app.listen(port, () => console.log(`API running on ${port}`));
