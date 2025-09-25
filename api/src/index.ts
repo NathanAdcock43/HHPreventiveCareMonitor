@@ -3,6 +3,7 @@ import members from "./routes/members";
 import alerts from "./routes/alerts";
 import simulate from "./routes/simulate";
 import openAlerts from "./routes/openAlerts";
+import dbPing from "./routes/dbPing";
 
 export const app = express();
 const port = process.env.PORT || 3001;
@@ -19,6 +20,7 @@ app.use("/members", members);
 app.use("/alerts", alerts);
 app.use("/simulate", simulate);
 app.use("/alerts/open", openAlerts);
+app.use("/db-ping", dbPing);
 
 // Only start an HTTP server when not running in Lambda
 const runningInLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;

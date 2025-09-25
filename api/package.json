@@ -14,18 +14,19 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.896.0",
     "express": "^5.1.0",
-    "serverless-http": "^3.2.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.5.2",
     "@types/pg": "^8.15.5",
-    "nodemon": "^3.1.10",
     "esbuild": "^0.23.x",
-    "ts-node-dev": "^2.x",
+    "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.x",
     "typescript": "^5.9.2"
   }
 }
