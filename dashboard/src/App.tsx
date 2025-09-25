@@ -1,6 +1,22 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
+// API helper
+const RAW_BASE = (process.env.REACT_APP_API_BASE || "").trim();
+export const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
+
+async function apiFetch(path: string, init?: RequestInit) {
+    const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+    const res = await fetch(url, init);
+    if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ` - ${text}` : ""}`);
+    }
+    const ct = res.headers.get("content-type") || "";
+    return ct.includes("application/json") ? res.json() : res.text();
+}
+
+
 type OpenAlertRow = {
     public_id: string;
     sex: "F" | "M" | "U" | null;
@@ -24,9 +40,8 @@ export default function App() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/members/${id ?? member}/alerts`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            setAlerts(await res.json());
+            const data = await apiFetch(`/members/${id ?? member}/alerts`);
+            setAlerts(data);
         } catch (e: any) {
             setError(e.message || "Request failed");
         } finally {
@@ -36,9 +51,8 @@ export default function App() {
 
     const fetchSummary = async () => {
         try {
-            const res = await fetch(`/alerts?type=A1C_OVERDUE`);
-            const data = await res.json();
-            setSummary(data.summary || []);
+            const data = await apiFetch(`/alerts?type=A1C_OVERDUE`);
+            setSummary((data as any).summary || []);
         } catch {
             /* ignore */
         }
@@ -46,11 +60,9 @@ export default function App() {
 
     const fetchOpenAlerts = async () => {
         try {
-            const res = await fetch(`/alerts/open?limit=200&offset=0`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            setOpenItems(data.items || []);
-            setOpenTotal(data.total || 0);
+            const data = await apiFetch(`/alerts/open?limit=200&offset=0`);
+            setOpenItems((data as any).items || []);
+            setOpenTotal((data as any).total || 0);
         } catch (e: any) {
             setError(e.message || "Failed to load open alerts");
         }
@@ -63,38 +75,36 @@ export default function App() {
     const createMember = async () => {
         setMsg(null);
         setError(null);
-        const r = await fetch(`/simulate?action=member`, { method: "POST" });
-        const d = await r.json();
-        if (!r.ok) {
-            setError(d.message || "member create failed");
+        try {
+            const d: any = await apiFetch(`/simulate?action=member`, { method: "POST" });
+            if (d.public_id) setMember(d.public_id);
+            setMsg(`New member enrolled: ${d.public_id}`);
+            await refresh(d.public_id);
+            return d.public_id as string;
+        } catch (e: any) {
+            setError(e.message || "member create failed");
             return null;
         }
-        if (d.public_id) setMember(d.public_id);
-        setMsg(`New member enrolled: ${d.public_id}`);
-        await refresh(d.public_id);
-        return d.public_id as string;
     };
 
     const simulate = async (action: string, targetPublicId: string) => {
-        const url = `/simulate?action=${encodeURIComponent(
-            action
-        )}&publicId=${encodeURIComponent(targetPublicId)}`;
-        const r = await fetch(url, { method: "POST" });
-        const d = await r.json();
-        return { ok: r.ok, data: d };
+        const url = `/simulate?action=${encodeURIComponent(action)}&publicId=${encodeURIComponent(
+            targetPublicId
+        )}`;
+        try {
+            const d = await apiFetch(url, { method: "POST" });
+            return { ok: true, data: d };
+        } catch (e: any) {
+            return { ok: false, data: { message: e.message } };
+        }
     };
 
     /** Prefer a random member with open alerts; fall back to current. */
     async function pickRandomMember(current: string): Promise<string> {
         try {
-            const res = await fetch(`/alerts/open?limit=500&offset=0`);
-            if (res.ok) {
-                const data = await res.json();
-                const ids: string[] = (data.items || []).map((x: any) => x.public_id);
-                if (ids.length > 0) {
-                    return ids[Math.floor(Math.random() * ids.length)];
-                }
-            }
+            const data: any = await apiFetch(`/alerts/open?limit=500&offset=0`);
+            const ids: string[] = (data.items || []).map((x: any) => x.public_id);
+            if (ids.length > 0) return ids[Math.floor(Math.random() * ids.length)];
         } catch {
             /* ignore */
         }
@@ -102,10 +112,7 @@ export default function App() {
     }
 
     // Map API action keys to the exact user-facing messages (as provided)
-    const messageMap: Record<
-        "lab_recent" | "lab_old" | "flu_recent" | "flu_old",
-        string
-    > = {
+    const messageMap: Record<"lab_recent" | "lab_old" | "flu_recent" | "flu_old", string> = {
         lab_recent: "Member record for new A1C Lab received",
         lab_old: "Member record for outdated A1C Lab received",
         flu_recent: "Recent member Flu immunization record received",
@@ -127,7 +134,7 @@ export default function App() {
         let r = await simulate(action, target);
 
         // if that member doesn't exist, create one and retry once
-        if (!r.ok && r.data?.error === "not_found") {
+        if (!r.ok && (r.data as any)?.error === "not_found") {
             const pid = await createMember();
             if (!pid) {
                 setError("Could not create member to run event.");
@@ -138,7 +145,7 @@ export default function App() {
         }
 
         if (!r.ok) {
-            setError(r.data?.message || "simulate failed");
+            setError((r.data as any)?.message || "simulate failed");
             return;
         }
 
@@ -150,17 +157,20 @@ export default function App() {
 
     useEffect(() => {
         refresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
         <div className="container">
             <div className="cushion">
                 <h1 className="header">Preventive Care Internal Dashboard</h1>
+                {/* Helpful during deploy/debug: show which API we're using */}
+                {API_BASE && <div className="meta">API: {API_BASE}</div>}
             </div>
 
-            <div className="card" style={{marginTop: "10px"}}>
+            <div className="card" style={{ marginTop: "10px" }}>
                 <div className="cushion">
-                        <div className="section-title">Members with open alerts</div>
+                    <div className="section-title">Members with open alerts</div>
                 </div>
                 <div className="fl-container">
                     <div className="fl-box"></div>
@@ -183,7 +193,7 @@ export default function App() {
                         <tbody>
                         {openItems.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="meta" style={{padding: 12}}>
+                                <td colSpan={4} className="meta" style={{ padding: 12 }}>
                                     No members with open alerts.
                                 </td>
                             </tr>
@@ -210,28 +220,20 @@ export default function App() {
 
             <div className="flex-container">
                 <div className="flex-box">
-
-
                     {/* Member Select */}
                     <div className="cushion">
                         <h2 className="section-title">Member Select</h2>
                     </div>
                     <div className="toolbar">
                         <label className="label">Member ID:&nbsp;</label>
-                        <input
-                            className="input"
-                            value={member}
-                            onChange={(e) => setMember(e.target.value)}
-                        />
+                        <input className="input" value={member} onChange={(e) => setMember(e.target.value)} />
                         <button className="btn" onClick={() => fetchAlerts(member)}>
                             Load
                         </button>
                     </div>
 
-                    {/* Member Alerts (softer heading, no bullets) */}
-                    <div className="member-alert">
-                        Member Notifications
-                    </div>
+                    {/* Member Alerts */}
+                    <div className="member-alert">Member Notifications</div>
                     {alerts.length === 0 ? (
                         <p className="meta">No active alerts.</p>
                     ) : (
@@ -241,20 +243,19 @@ export default function App() {
                                     <span>{a.status} ALERT (</span>
                                     <span className="alert-type">{a.type})</span>
                                     <span className="alert-meta">
-                (updated {new Date(a.updated_at).toLocaleString()})
-              </span>
+                    (updated {new Date(a.updated_at).toLocaleString()})
+                  </span>
                                 </li>
                             ))}
                         </ul>
                     )}
-
                 </div>
-                <div className="flex-box">
 
+                <div className="flex-box">
                     <div className="cushion">
                         <h2 className="section-title">Simulate Incoming SQS Events</h2>
                     </div>
-                    <div className="toolbar" style={{gap: "8px"}}>
+                    <div className="toolbar" style={{ gap: "8px" }}>
                         <button className="btn" onClick={createMember}>
                             New Member Enrollment
                         </button>
@@ -269,13 +270,8 @@ export default function App() {
                             Error: {error}
                         </p>
                     )}
-
                 </div>
             </div>
-
-
-
-
         </div>
     );
 }
