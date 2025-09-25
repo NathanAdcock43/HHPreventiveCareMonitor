@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import members from "./routes/members";
 import alerts from "./routes/alerts";
 import simulate from "./routes/simulate";
@@ -29,3 +30,11 @@ const runningInLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 if (!runningInLambda) {
     app.listen(port, () => console.log(`API running on ${port}`));
 }
+
+app.use(
+    cors({
+        origin: "https://hhmonitor.nathanadcock.dev",
+        methods: ["GET", "POST", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"]
+    })
+);
