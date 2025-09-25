@@ -154,13 +154,20 @@ export default function App() {
 
     return (
         <div className="container">
-            <h1 className="header">Preventive Care Internal Dashboard</h1>
-
+            <div className="cushion">
+                <h1 className="header">Preventive Care Internal Dashboard</h1>
+            </div>
 
             <div className="card" style={{marginTop: "10px"}}>
-                <div className="badge">
-                        <h2 className="section-title">Members with open alerts</h2>
+                <div className="cushion">
+                        <div className="section-title">Members with open alerts</div>
+                </div>
+                <div className="fl-container">
+                    <div className="fl-box"></div>
+                    <div className="fl-box">
                         <div className="meta">Open: {openTotal}</div>
+                    </div>
+                    <div className="fl-box"></div>
                 </div>
 
                 <div className="grid-wrap">
@@ -206,25 +213,24 @@ export default function App() {
 
 
                     {/* Member Select */}
-                    <div className="subhead">Member Select</div>
+                    <div className="cushion">
+                        <h2 className="section-title">Member Select</h2>
+                    </div>
                     <div className="toolbar">
-                        <label className="label">Member:&nbsp;</label>
+                        <label className="label">Member ID:&nbsp;</label>
                         <input
                             className="input"
                             value={member}
                             onChange={(e) => setMember(e.target.value)}
                         />
                         <button className="btn" onClick={() => fetchAlerts(member)}>
-                            Load Alerts
+                            Load
                         </button>
                     </div>
 
                     {/* Member Alerts (softer heading, no bullets) */}
-                    <div
-                        className="section-title"
-                        style={{fontSize: "20px", fontWeight: 600}}
-                    >
-                        Member alerts
+                    <div className="member-alert">
+                        Member Notifications
                     </div>
                     {alerts.length === 0 ? (
                         <p className="meta">No active alerts.</p>
@@ -242,15 +248,12 @@ export default function App() {
                         </ul>
                     )}
 
-
-
-
-
                 </div>
                 <div className="flex-box">
 
-
-                    <h2 className="section-title">Simulate system events</h2>
+                    <div className="cushion">
+                        <h2 className="section-title">Simulate Incoming SQS Events</h2>
+                    </div>
                     <div className="toolbar" style={{gap: "8px"}}>
                         <button className="btn" onClick={createMember}>
                             New Member Enrollment
